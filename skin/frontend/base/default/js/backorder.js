@@ -1,19 +1,20 @@
 var backorder = Class.create({
     afterInit: function() {
-        this.orderbeforestring = false;
         if (this.isproduct) {
-            if (this.productestimate || this.orderbefore) {
-                if (this.producttype == "grouped") {
-                    this.initGrouped();
-                } else if (this.producttype == "configurable") {
-                    this.initConfigurable();
-                } else if (this.producttype == "bundle") {
-                    this.initBundle();
-                } else {
-                    if (this.productestimate) {
-                        $$(".availability")[0].insert({after: "<p class=\"dispatch-estimate\">" + this.estimatetext + ": <span>" + this.productestimate + "</span></p>"});
+            if (this.isValidProductType()) {
+                if (this.productestimate || this.orderbefore) {
+                    if (this.producttype == "grouped") {
+                        this.initGrouped();
+                    } else if (this.producttype == "configurable") {
+                        this.initConfigurable();
+                    } else if (this.producttype == "bundle") {
+                        this.initBundle();
                     } else {
-                        $$(".availability")[0].insert({after: "<div class=\"dispatch-nolead\">" + this.getOrderBeforeString() + "</div>"});
+                        if (this.productestimate) {
+                            $$(".availability")[0].insert({after: "<p class=\"dispatch-estimate\">" + this.estimatetext + ": <span>" + this.productestimate + "</span></p>"});
+                        } else if (this.showorderbefore) {
+                            $$(".availability")[0].insert({after: "<div class=\"dispatch-nolead\">" + this.getOrderBeforeString() + "</div>"});
+                        }
                     }
                 }
             }
@@ -21,16 +22,20 @@ var backorder = Class.create({
             $$("#shopping-cart-table .product-name").each(function(e) {
                 var estimate = this.cartestimates.shift();
                 var itemid = this.itemids.shift();
-                var checked = "";
-                if (this.hasaccepted || this.acceptedids.indexOf(itemid) >= 0) {
-                    checked = "checked ";
-                }
-                if (!estimate && this.orderbefore) {
-                    e.insert({after: "<div class=\"dispatch-nolead\">" + this.getOrderBeforeString() + "</div>"});
-                } else if (estimate) {
-                    e.insert({after: "<div class=\"dispatch-estimate\">" + this.estimatetext + ": <span>" + estimate + "</span></div>"});
-                    if (this.acceptenabled) {
-                        e.next().insert({after: "<div class=\"backorder-accept\"><input " + checked + "type=\"checkbox\" class=\"checkbox\" name=\"backorder[" + itemid + "]\" /><span>" + this.delayedtext + "</span></div>"});
+                var showorderbefore = this.showorderbefore.shift();
+                var producttype = this.cartproducttypes.shift();
+                if (this.isValidProductType(producttype)) {
+                    var checked = "";
+                    if (this.hasaccepted || this.acceptedids.indexOf(itemid) >= 0) {
+                        checked = "checked ";
+                    }
+                    if (!estimate && this.orderbefore && showorderbefore) {
+                        e.insert({after: "<div class=\"dispatch-nolead\">" + this.getOrderBeforeString() + "</div>"});
+                    } else if (estimate) {
+                        e.insert({after: "<div class=\"dispatch-estimate\">" + this.estimatetext + ": <span>" + estimate + "</span></div>"});
+                        if (this.acceptenabled) {
+                            e.next().insert({after: "<div class=\"backorder-accept\"><input " + checked + "type=\"checkbox\" class=\"checkbox\" name=\"backorder[" + itemid + "]\" /><span>" + this.delayedtext + "</span></div>"});
+                        }
                     }
                 }
             }.bind(this));
@@ -73,7 +78,7 @@ var backorder = Class.create({
             var productid = e.name.match(/[0-9]+/);
             if (this.productestimate[productid]) {
                 e.up("tr").down().insert({bottom: "<p class=\"dispatch-estimate\">" + this.estimatetext + ": <span>" + this.productestimate[productid] + "</span></p>"});
-            } else if (this.orderbefore) {
+            } else if (this.orderbefore && this.showorderbefore[productid]) {
                 e.up("tr").down().insert({bottom: "<p class=\"dispatch-nolead\">" + this.getOrderBeforeString() + "</p>"});
             }
         }.bind(this));
@@ -95,7 +100,7 @@ var backorder = Class.create({
         if (productid) {
             if (this.productestimate[productid]) {
                 $$(".availability")[0].insert({after: "<p class=\"dispatch-estimate\">" + this.estimatetext + ": <span>" + this.productestimate[productid] + "</span></p>"});
-            } else if (this.orderbefore) {
+            } else if (this.orderbefore && this.showorderbefore[productid]) {
                 $$(".availability")[0].insert({after: "<p class=\"dispatch-nolead\">" + this.getOrderBeforeString() + "</p>"});
             }
         }
@@ -126,6 +131,7 @@ var backorder = Class.create({
         this.removeEstimate();
         var estimates = [];
         var selected = $("product_addtocart_form").serialize(true);
+        var showbundleorderbefore = false
         $H(selected).each(function(e) {
             if (e.key.indexOf("bundle_option") == 0 && e.value != "") {
                 var bundleid = e.key.match(/[0-9]+/);
@@ -139,6 +145,8 @@ var backorder = Class.create({
                     var estimate = this.getBundleEstimate(bundleid, value);
                     if (estimate) {
                         estimates.push(estimate);
+                    } else if (this.showorderbefore[bundleid][value]) {
+                        showbundleorderbefore = true;
                     }
                 }.bind(this));
             }
@@ -146,7 +154,7 @@ var backorder = Class.create({
         var estimate = this.getLongestBundleEstimate(estimates);
         if (estimate) {
             $$(".availability")[0].insert({after: "<p class=\"dispatch-estimate\">" + this.estimatetext + ": <span>" + estimate + "</span></p>"});
-        } else if (this.orderbefore) {
+        } else if (this.orderbefore && showbundleorderbefore) {
             $$(".availability")[0].insert({after: "<p class=\"dispatch-nolead\">" + this.getOrderBeforeString() + "</p>"});
         }
     },
@@ -215,5 +223,11 @@ var backorder = Class.create({
         new Ajax.Request(this.acceptedurl, {
             parameters: {accepted: accepted, itemids: itemids.join()}
         });
+    },
+    isValidProductType: function(type) {
+        if (!type) {
+            var type = this.producttype;
+        }
+        return type == "grouped" || type == "configurable" || type == "bundle" || type == "simple";
     }
 });
