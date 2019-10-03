@@ -1,7 +1,7 @@
 {
-    "name": "OpenMageModuleFostering\/HusseyCoding_Backorder",
+    "name": "openmage-module-fostering\/husseycoding_backorder",
     "type": "magento-module",
-    "license": "Open-Software-License-(OSL)",
+    "license": "OSL-3.0",
     "homepage": "",
     "description": "Adds dispatch estimate notifications to product pages and the cart.",
     "authors": [
